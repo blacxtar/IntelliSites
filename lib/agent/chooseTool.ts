@@ -4,7 +4,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-export async function chooseTool(userIntent: string) {
+export async function chooseTool(userIntent: string): Promise<string> {
   const response = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     temperature: 0,
@@ -12,10 +12,16 @@ export async function chooseTool(userIntent: string) {
       {
         role: "system",
         content: `
-You are an AI agent.
-You can choose ONLY ONE tool.
-Return ONLY the tool name.
-Available tools:
+You are a tool router.
+Your ONLY job is to choose the correct tool name.
+
+Rules:
+- You MUST return exactly one of these values
+- Do NOT ask questions
+- Do NOT explain anything
+- Do NOT mention missing data
+
+Allowed outputs:
 - analyzeSummary
 - analyzeBusinessModel
         `,
@@ -27,11 +33,19 @@ Available tools:
     ],
   });
 
-  const toolName = response?.choices?.[0]?.message?.content;
+  const raw = response?.choices?.[0]?.message?.content;
 
-  if (!toolName) {
+  if (!raw) {
     throw new Error("LLM did not return a tool name");
   }
 
-  return toolName.trim();
+  const tool = raw.trim();
+
+  // 🔐 Hard guard (important)
+  if (tool !== "analyzeSummary" && tool !== "analyzeBusinessModel") {
+    console.warn("Invalid tool from LLM:", tool);
+    return "analyzeSummary"; // safe default
+  }
+
+  return tool;
 }
