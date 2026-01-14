@@ -20,19 +20,14 @@ export async function POST(req: Request) {
     // 1️⃣ Retrieve relevant chunks
     const chunks = await retrieveRelevantChunks(siteId, question);
 
-    //testing chunks
-    console.log("Retrieved chunks:");
-    chunks.forEach((c, i) => {
-      console.log(`Chunk ${i}:`, c.text.slice(0, 200));
-    });
-
     // 2️⃣ Combine chunks into context
     const context = chunks.map((c) => c.text).join("\n\n");
 
     // 3️⃣ Ask LLM with context
-    const completion = await openai.chat.completions.create({
+    const stream = await openai.chat.completions.create({
       model: "gemini-3-flash-preview",
       temperature: 0.2,
+      stream: true,
       messages: [
         {
           role: "system",
@@ -57,11 +52,25 @@ ${question}
       ],
     });
 
-    const answer = completion.choices[0]?.message?.content;
+    const encoder = new TextEncoder();
 
-    return NextResponse.json({
-      answer,
-      sources: chunks.map((c) => c.id),
+    const readableStream = new ReadableStream({
+      async start(controller) {
+        for await (const chunk of stream) {
+          const token = chunk.choices?.[0]?.delta?.content;
+          if (token) {
+            controller.enqueue(encoder.encode(token));
+          }
+        }
+        controller.close();
+      },
+    });
+
+    return new NextResponse(readableStream, {
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Transfer-Encoding": "chunked",
+      },
     });
   } catch (error) {
     console.error(error);

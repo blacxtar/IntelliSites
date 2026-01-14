@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { ChatMessage } from "@/lib/types";
+import ReactMarkdown from "react-markdown";
+import { useEffect, useRef } from "react";
 
 type Props = {
   siteId: string;
@@ -11,6 +13,12 @@ export default function ChatUI({ siteId }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   async function sendMessage() {
     if (!input) return;
@@ -34,16 +42,31 @@ export default function ChatUI({ siteId }: Props) {
         }),
       });
 
-      if (!res.ok) throw new Error("RAG failed");
+      if (!res.body) throw new Error("No stream");
 
-      const data = await res.json();
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
 
-      const aiMsg: ChatMessage = {
-        role: "assistant",
-        content: data.answer,
-      };
+      let aiText = "";
 
-      setMessages((prev) => [...prev, aiMsg]);
+      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        aiText += chunk;
+
+        setMessages((prev) => {
+          const updated = [...prev];
+          updated[updated.length - 1] = {
+            role: "assistant",
+            content: aiText,
+          };
+          return updated;
+        });
+      }
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -75,10 +98,11 @@ export default function ChatUI({ siteId }: Props) {
                   : "bg-muted"
               }`}
             >
-              {msg.content}
+              <ReactMarkdown>{msg.content}</ReactMarkdown>
             </div>
           </div>
         ))}
+        <div ref={bottomRef} />
 
         {loading && (
           <div className="flex justify-start">
