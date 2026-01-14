@@ -3,6 +3,10 @@ import * as cheerio from "cheerio";
 import { NextResponse } from "next/server";
 import { chooseTool } from "@/lib/agent/chooseTool";
 import { executeTool } from "@/lib/agent/executeTool";
+import { chunkText } from "@/lib/rag/chunkText";
+import { saveChunks } from "@/lib/rag/store";
+import { randomUUID } from "crypto";
+import { embedText } from "@/lib/rag/embeddings";
 
 export async function POST(req: Request) {
   try {
@@ -26,6 +30,18 @@ export async function POST(req: Request) {
 
     const text = $("body").text().replace(/\s+/g, " ").trim().slice(0, 6000);
 
+    // chunking and saving
+    const siteId = randomUUID();
+    const chunks = await Promise.all(
+      chunkText(text).map(async (chunk, index) => ({
+        id: `${siteId}-${index}`,
+        text: chunk,
+        embedding: await embedText(chunk),
+      }))
+    );
+
+    saveChunks(siteId, chunks);
+
     // 🧠 AGENT THINKING
     const chosenTool = await chooseTool(question);
 
@@ -33,6 +49,7 @@ export async function POST(req: Request) {
     const result = await executeTool(chosenTool, text);
 
     return NextResponse.json({
+      siteId,
       toolUsed: chosenTool,
       result,
     });

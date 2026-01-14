@@ -1,12 +1,13 @@
 import OpenAI from "openai";
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.GEMINI_API_KEY,
+  baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
 });
 
 export async function chooseTool(userIntent: string): Promise<string> {
   const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: "gemini-3-flash-preview",
     temperature: 0,
     messages: [
       {
