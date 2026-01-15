@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs";
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
@@ -21,6 +22,14 @@ export default function Navbar() {
           <NavItem href="/" label="Home" active={pathname === "/"} />
           <NavItem href="/chat" label="Chat" active={pathname === "/chat"} />
           <NavItem href="/docs" label="Docs" active={pathname === "/docs"} />
+
+          <SignedOut>
+            <SignInButton />
+          </SignedOut>
+
+          <SignedIn>
+            <UserButton />
+          </SignedIn>
         </div>
 
         {/* Mobile Menu Button */}
@@ -50,6 +59,13 @@ export default function Navbar() {
             active={pathname === "/docs"}
             onClick={() => setOpen(false)}
           />
+          <SignedOut>
+            <SignInButton />
+          </SignedOut>
+
+          <SignedIn>
+            <UserButton />
+          </SignedIn>
         </div>
       )}
     </nav>

@@ -1,0 +1,27 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Website {
+  id        String   @id @default(cuid())
+  userId    String
+  url       String
+  createdAt DateTime @default(now())
+
+  chats     ChatMessage[]
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  siteId    String
+  role      String
+  content   String
+  createdAt DateTime @default(now())
+
+  website   Website @relation(fields: [siteId], references: [id])
+}
