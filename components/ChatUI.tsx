@@ -7,14 +7,21 @@ import { useEffect, useRef } from "react";
 
 type Props = {
   siteId: string;
+  initialMessages?: ChatMessage[];
 };
 
-export default function ChatUI({ siteId }: Props) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+export default function ChatUI({ siteId, initialMessages }: Props) {
+  const [messages, setMessages] = useState<ChatMessage[]>(
+    initialMessages ?? []
+  );
+
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    setMessages(initialMessages ?? []);
+  }, [initialMessages]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -24,6 +31,7 @@ export default function ChatUI({ siteId }: Props) {
     if (!input) return;
 
     const userMsg: ChatMessage = {
+      id: crypto.randomUUID(),
       role: "user",
       content: input,
     };
@@ -49,7 +57,16 @@ export default function ChatUI({ siteId }: Props) {
 
       let aiText = "";
 
-      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+      const assistantId = crypto.randomUUID();
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: assistantId,
+          role: "assistant",
+          content: "",
+        },
+      ]);
 
       while (true) {
         const { done, value } = await reader.read();
@@ -61,6 +78,7 @@ export default function ChatUI({ siteId }: Props) {
         setMessages((prev) => {
           const updated = [...prev];
           updated[updated.length - 1] = {
+            id: assistantId,
             role: "assistant",
             content: aiText,
           };
@@ -68,9 +86,11 @@ export default function ChatUI({ siteId }: Props) {
         });
       }
     } catch {
+      const assistantId = crypto.randomUUID();
       setMessages((prev) => [
         ...prev,
         {
+          id: assistantId,
           role: "assistant",
           content: "Something went wrong while answering.",
         },

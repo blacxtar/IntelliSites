@@ -1,3 +1,7 @@
+export const runtime = "nodejs";
+
+import prisma from "@/lib/prisma";
+
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { retrieveRelevantChunks } from "@/lib/rag/retrieve";
@@ -16,6 +20,14 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
+
+    await prisma.chatMessage.create({
+      data: {
+        siteId,
+        role: "user",
+        content: question,
+      },
+    });
 
     // 1️⃣ Retrieve relevant chunks
     const chunks = await retrieveRelevantChunks(siteId, question);
@@ -54,15 +66,33 @@ ${question}
 
     const encoder = new TextEncoder();
 
+    let fullAnswer = "";
+
     const readableStream = new ReadableStream({
       async start(controller) {
-        for await (const chunk of stream) {
-          const token = chunk.choices?.[0]?.delta?.content;
-          if (token) {
-            controller.enqueue(encoder.encode(token));
+        try {
+          for await (const chunk of stream) {
+            const token = chunk.choices?.[0]?.delta?.content;
+            if (token) {
+              fullAnswer += token;
+              controller.enqueue(encoder.encode(token));
+            }
           }
+
+          // ✅ Save assistant message after streaming finishes
+          await prisma.chatMessage.create({
+            data: {
+              siteId,
+              role: "assistant",
+              content: fullAnswer || "No answer generated.",
+            },
+          });
+
+          controller.close();
+        } catch (err) {
+          console.error("Streaming error:", err);
+          controller.error(err);
         }
-        controller.close();
       },
     });
 
